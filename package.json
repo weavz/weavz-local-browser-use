@@ -1,0 +1,55 @@
+{
+  "name": "@weavz-io/local-browser-use",
+  "version": "0.1.0",
+  "description": "Local browser companion for Weavz Agent Local Browser Control",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://weavz.io/docs/concepts/agent-browser#local-browser-control-experimental",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weavz/weavz-local-browser-use.git"
+  },
+  "bugs": {
+    "url": "https://github.com/weavz/weavz-local-browser-use/issues"
+  },
+  "keywords": [
+    "weavz",
+    "browser",
+    "local-browser",
+    "browser-use",
+    "automation",
+    "agents",
+    "mcp",
+    "playwright",
+    "chrome"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "weavz-local-browser-use": "./dist/cli.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "prepack": "node scripts/prepack.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "playwright-core": "1.56.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.12",
+    "esbuild": "0.28.0",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,135 @@
+name: Release Local Browser Use
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and validate without publishing
+        required: true
+        default: true
+        type: boolean
+      npm_tag:
+        description: npm dist-tag to publish
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - next
+      confirm_release:
+        description: Type release-local-browser-use to publish
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: local-browser-use-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release @weavz-io/local-browser-use
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm-release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+
+      - name: Validate release request
+        run: |
+          if [ "$GITHUB_REF_NAME" != "main" ]; then
+            echo "Local browser releases must run from main. Current ref: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+          if [ "$DRY_RUN" = "false" ] && [ "$CONFIRM_RELEASE" != "release-local-browser-use" ]; then
+            echo "Real release requires confirm_release=release-local-browser-use"
+            exit 1
+          fi
+
+          case "$NPM_TAG" in
+            latest|next) ;;
+            *)
+              echo "Unsupported npm tag: ${NPM_TAG}"
+              exit 1
+              ;;
+          esac
+        env:
+          CONFIRM_RELEASE: ${{ inputs.confirm_release }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          NPM_TAG: ${{ inputs.npm_tag }}
+
+      - name: Install runtime dependencies
+        run: npm install --omit=dev --ignore-scripts
+
+      - name: Validate package
+        id: package
+        run: |
+          test -f dist/cli.mjs
+          node dist/cli.mjs --help
+          version="$(node -p "require('./package.json').version")"
+          actual="$(node dist/cli.mjs --version)"
+          if [ "$actual" != "$version" ]; then
+            echo "CLI version ${actual} does not match package version ${version}"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          if npm view "@weavz-io/local-browser-use@${version}" version >/dev/null 2>&1; then
+            echo "@weavz-io/local-browser-use@${version} is already published"
+            exit 1
+          fi
+
+          npm pack --dry-run
+
+      - name: Publish to npm
+        if: inputs.dry_run == false
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN is required for npm publishing"
+            exit 1
+          fi
+
+          npm publish --access public --provenance --tag "$NPM_TAG"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ inputs.npm_tag }}
+
+      - name: Tag release
+        if: inputs.dry_run == false
+        run: |
+          tag="v${VERSION}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Git tag ${tag} already exists"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+
+      - name: Create GitHub release
+        if: inputs.dry_run == false
+        run: |
+          gh release create "v${VERSION}" \
+            --title "@weavz-io/local-browser-use v${VERSION}" \
+            --notes "Published @weavz-io/local-browser-use@${VERSION} to npm."
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.package.outputs.version }}
