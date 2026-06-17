@@ -32,7 +32,7 @@
     "LICENSE"
   ],
   "bin": {
-    "weavz-local-browser-use": "./dist/cli.mjs"
+    "weavz-local-browser-use": "dist/cli.mjs"
   },
   "publishConfig": {
     "access": "public"
